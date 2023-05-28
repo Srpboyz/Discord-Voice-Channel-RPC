@@ -1,19 +1,23 @@
+from pypresence import Client
+from pypresence.exceptions import DiscordError, InvalidID, ServerError
+from Client import start_client
 from exceptions import NoClientGiven, NotSetup
 from info import info
-from Client import start_client
 from typing import Tuple, List, Dict, Any
-from time import sleep
+from time import sleep, time
 from sys import exit
-import pypresence
 import asyncio
 
 
 class VoiceClient:
+    __slots__ = "__client", "__id", "__info", "__time", "_paused"
+
     def __init__(self):
         self.start()
+        self.__time = None
         self._paused = False
 
-    def start(self) -> Tuple[pypresence.Client, str]:
+    def start(self) -> Tuple[Client, str]:
         data = info()
         data = data.get("VC")
         if not data:
@@ -31,7 +35,7 @@ class VoiceClient:
                 )
                 if client:
                     self.__client, self.__id = client, id
-                    self.__info = [None, None, None, None]
+                    self.__info = (None, None, None, None)
                     return
             if not client:
                 sleep(3)
@@ -43,30 +47,30 @@ class VoiceClient:
             self.__client.clear_activity()
         except:
             pass
+        self.__time = None
         self.__client.close()
 
     def pause(self) -> None:
         if not self._paused:
             self.__client.clear_activity()
-            self.__info = [None, None, None, None]
+            self.__info = (None, None, None, None)
+            self.__time = None
         else:
             self.update()
         self._paused = not self._paused
 
-    def get_peeps(self, *, voice_states: List[Dict[str, Any]]) -> List[str]:
+    def get_peeps(self, *, voice_states: List[Dict[str, Any]]) -> str:
         peeps = [
             user["user"]["username"]
             for user in voice_states
             if user["user"]["id"] != self.__id and not user["user"]["bot"]
         ]
-        if len(peeps) == 1:
-            return f"1 other person"
-        if len(peeps) > 1:
-            return f"{len(peeps)} other people"
-        return None
+        if not peeps:
+            return None
+        return f"{len(peeps)} other people"
 
     def get_vc(self) -> Tuple[str | None, str | None, str | None, str | None]:
-        if not isinstance(self.__client, pypresence.Client):
+        if not isinstance(self.__client, Client):
             raise NoClientGiven(
                 f"Client must of type pypresence.Client not {type(self.__client)}"
             )
@@ -89,50 +93,49 @@ class VoiceClient:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         while True:
-            if not self._paused:
-                self.update()
-                sleep(10)
+            self.update()
+            sleep(15)
 
     def update(self) -> None:
         try:
+            if self._paused:
+                return
             vc, guild, img, peeps = self.get_vc()
-            if self.__info == [vc, guild, img, peeps]:
+            if self.__info == (vc, guild, img, peeps):
                 return
             small_image = "https://c.tenor.com/TgKK6YKNkm0AAAAi/verified-verificado.gif"
             if img:
-                if not guild and not self._paused:
-                    self.__client.set_activity(
-                        details=f"In a Voice Call",
-                        large_image=img,
-                        small_image=small_image,
-                    )
-                elif peeps and not self._paused:
-                    self.__client.set_activity(
-                        details=f"{guild} in {vc}",
-                        state=f"with {peeps}",
-                        large_image=img,
-                        small_image=small_image,
-                    )
-                elif not self._paused:
-                    self.__client.set_activity(
-                        details=f"Listening in {guild}",
-                        state=f"in {vc}",
-                        large_image=img,
-                        small_image=small_image,
-                    )
-            elif not self._paused:
+                if not self.__time:
+                    self.__time = time()
+                if not guild:
+                    details = "In a Voice Call"
+                    state = None
+                elif peeps:
+                    details = f"{guild} in {vc}"
+                    state = f"with {peeps}"
+                else:
+                    details = f"Listening in {guild}"
+                    state = f"in {vc}"
+
+                self.__client.set_activity(
+                    details=details,
+                    state=state,
+                    large_image=img,
+                    small_image=small_image,
+                    start=self.__time,
+                )
+            else:
                 self.__client.clear_activity()
-            if not self._paused:
-                self.__info = [vc, guild, img, peeps]
-        except (
-            pypresence.exceptions.InvalidID,
-            pypresence.exceptions.ServerError,
-            pypresence.exceptions.DiscordError,
-        ):
+                self.__time = None
+            self.__info = (vc, guild, img, peeps)
+        except (InvalidID, ServerError, DiscordError):
             self.stop()
             self.start()
-        except NoClientGiven as e:
+        except NoClientGiven:
+            self.__time = None
             exit(0)
+        except:
+            return
 
 
 if __name__ == "__main__":

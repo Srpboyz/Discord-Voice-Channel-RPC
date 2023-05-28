@@ -1,9 +1,9 @@
-from typing import Any
+from typing import Any, Dict
 import json
 
 
-def info() -> Any:
-    with open("info.json") as f:
+def info() -> Dict[str, Any]:
+    with open("C:/Shawn/Discord/info.json") as f:
         return json.load(f)
 
 

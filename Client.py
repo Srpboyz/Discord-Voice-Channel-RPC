@@ -1,10 +1,10 @@
+from pypresence import Client
+from pypresence.exceptions import DiscordError, ServerError
 from exceptions import NoClientID
 from info import set_token
 from datetime import datetime
-from typing import Optional, Dict
-from pypresence import Client
 from sys import exit
-import pypresence
+from typing import Dict, Optional
 import requests
 import asyncio
 
@@ -93,7 +93,7 @@ def start_client(
             set_token(id, token, r_token, start)
         client.authenticate(token)
         return client
-    except (pypresence.exceptions.ServerError, pypresence.exceptions.DiscordError):
+    except (ServerError, DiscordError):
         return None
     except KeyboardInterrupt:
         exit(0)
